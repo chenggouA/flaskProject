@@ -13,22 +13,7 @@ executor = Executor(app)
 # tumble_predict = YOLOV5("./ai/onnx/tumble.onnx", CLASSES)
 # localCamera = camera([tumble_predict])
 
-camera_stream = CameraStream()
-
-def read_camera():
-    # 创建一个循环，用于不断地读取摄像头的图像并调用 camera_stream.update_frame
-    cap = cv2.VideoCapture("2.mp4")
-    try:
-        while True:
-            flag, frame = cap.read()
-            if not flag:
-                break
-            _, bytes_arr = cv2.imencode('.jpg', frame)
-
-            camera_stream.update_frame(bytes_arr.tobytes())
-    finally:
-        print("摄像头关闭")
-        cap.release()
+camera_stream = CameraStream(0)
 
 
 
@@ -39,26 +24,19 @@ def read_camera():
 def index():
     return render_template('index.html') 
 
-import time
 @app.route('/video_feed')
 def video_feed():
-    print("用户开始播放")
-    queue = camera_stream.subscribe()
-    time.sleep(10)
-    try:
-        def generate():
-            while True:
-                frame = queue.get(timeout=10) # queue为空会阻塞线程
-                print(f"f{len(frame)}")
-                yield (b'--frame\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-        return Response(generate(), mimetype='multipart/x-mixed-replace;boundary=frame')
-    finally:
-        print("用户停止播放")
-        camera_stream.unsubscribe(queue)
+    # try:
+    def gen():
+        print("用户开始播放")
+        frame = camera_stream.subscribe()
+        while True:
+            yield camera_stream.get_frame(frame)
+    return Response(gen(), mimetype='multipart/x-mixed-replace;boundary=frame')
+    # finally:
+    #     print("用户停止播放")
+        # camera_stream.unsubscribe(frame)
 
-with app.test_request_context():
-    executor.submit(read_camera)
 
 
 if __name__ == '__main__':

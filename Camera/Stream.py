@@ -1,25 +1,43 @@
 from queue import Queue
 import numpy as np
+import cv2
 from typing import List
+
+class frame:
+    def __init__(self, has_frame = False):
+        self.has_frame = has_frame
+        self.frame = None
+
+    def get_frame(self)-> np.ndarray:
+
+        return self.frame
+    
 class CameraStream:
 
-    def __init__(self, max_len = 200):
-        self.max_len: int = max_len
-        self.clients: List[Queue] = []
-        self.last_frame = None
+    def __init__(self, url):
+        self.cap = cv2.VideoCapture(url)
+        assert self.cap.isOpened(), "加载失败"
+        self.clients: List[frame] = []
 
-    def subscribe(self):
-        queue = Queue()
-        self.clients.append(queue)
-        return queue
+    def subscribe(self)-> frame:
+        f = frame()
+        self.clients.append(f)
+        return f
     
-    def unsubscribe(self, queue):
-        self.clients.remove(queue)
+    def unsubscribe(self, frame):
+        self.clients.remove(frame)
 
-    def update_frame(self, frame):
+    def get_frame(self, frame):
+        if frame.has_frame:
+            new_frame = frame.get_frame()
+            
+        else:
+            _, new_frame = self.cap.read()
+            for client in self.clients:
+                client.frame = new_frame
+                client.has_frame = True
         
-        for client in self.clients:
-            print(client.qsize())
-            # if client.qsize() >= self.max_len:
-            #     client.get()
-            client.put(frame)
+        frame.has_frame = False
+        _, f = cv2.imencode(".jpg", new_frame)
+        return (b'--frame\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + f.tobytes() + b'\r\n')
