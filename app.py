@@ -1,36 +1,48 @@
 from flask import Flask, render_template, Response
-from Camera.LocalCamera import camera
 from Camera.Stream import CameraStream
-from ai.model import YOLOV5 
+# from ai.model import YOLOV5 
 from flask_executor import Executor
+from Camera.HKcam import HKCam
+import time
+import os
 import cv2
-app = Flask(__name__)
-executor = Executor(app)
 
 
 # === 全局变量 ===
 # CLASSES = ['down', 'person']
 # tumble_predict = YOLOV5("./ai/onnx/tumble.onnx", CLASSES)
 # localCamera = camera([tumble_predict])
+camIP ='192.168.1.64'
+DEV_PORT = 8000
+username ='admin'
+password = 'haut2023'
+
+HIK= HKCam(camIP,username,password)
+os.chdir(os.path.dirname(__file__))
+# === 全局变量 ===
+
+app = Flask(__name__)
+executor = Executor(app)
 
 camera_stream = CameraStream()
 
-def read_camera():
-    global camera_stream
+def read_camera(HIK):
     # 创建一个循环，用于不断地读取摄像头的图像并调用 camera_stream.update_frame
-    cap = cv2.VideoCapture(0)
     try:
         print("摄像头开启")
         while True:
-            flag, frame = cap.read()
-            if not flag:
-                break
-            _, bytes_arr = cv2.imencode('.jpg', frame)
+            n_stamp, img = HIK.read()
+
+            """
+                TODO: 
+            """
+            
+            _, bytes_arr = cv2.imencode('.jpg', img)
 
             camera_stream.update_frame(bytes_arr.tobytes())
     finally:
         print("摄像头关闭")
-        cap.release()
+        HIK.release()
 
 
 # === 全局变量 ===
@@ -54,7 +66,7 @@ def video_feed():
     
 
 with app.test_request_context():
-    executor.submit(read_camera)
+    executor.submit(read_camera, HIK)
 
 
 if __name__ == '__main__':
